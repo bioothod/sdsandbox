@@ -150,7 +150,7 @@ namespace tk
                     }
                     catch(SocketException e)
                     {
-                        Debug.LogWarning("connection dropped.");
+                        Debug.LogWarning("connection dropped: " + e);
                         dropped = true;
                     }
                 }
@@ -170,7 +170,7 @@ namespace tk
             {
                 recieved = 0;
                 dropped = true;
-                Debug.LogWarning("Exception on recv. Connection dropped.");
+                Debug.LogWarning("Exception on recv. Connection dropped: " + e);
             }
             
 

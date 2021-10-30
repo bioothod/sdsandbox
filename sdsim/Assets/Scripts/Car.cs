@@ -1,9 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-
 public class Car : MonoBehaviour, ICar {
-
 	public WheelCollider[] wheelColliders;
 	public Transform[] wheelMeshes;
 
@@ -18,11 +16,9 @@ public class Car : MonoBehaviour, ICar {
 
 	public Vector3 acceleration = Vector3.zero;
 	public Vector3 velocity = Vector3.zero;
-	public Vector3 prevVel = Vector3.zero;
 
 	public Vector3 startPos;
 	public Quaternion startRot;
-	private Quaternion rotation = Quaternion.identity;
 	private Quaternion gyro = Quaternion.identity;
 	public float length = 1.7f;
 
@@ -36,19 +32,18 @@ public class Car : MonoBehaviour, ICar {
 	//use this label to pull partial training samples from a run 
 	public string activity = "keep_lane";
 
-    public float maxSteer = 16.0f;
+	public float maxSteer = 16.0f;
 	public float SteerSpeed = 10000000.0f;
 
 	//name of the last object we hit.
 	public string last_collision = "none";
 
-	// Use this for initialization
-	void Awake () 
-	{
+	private bool after_reset = false;
+
+	void Awake() {
 		rb = GetComponent<Rigidbody>();
 
-		if(rb && centrOfMass)
-		{
+		if (rb && centrOfMass) {
 			rb.centerOfMass = centrOfMass.localPosition;
 		}
 
@@ -56,203 +51,165 @@ public class Car : MonoBehaviour, ICar {
 		requestSteering = 0f;
 
 		SavePosRot();
-		
-		// had to disable this because PID max steering was affecting the global max_steering
-        // maxSteer = PlayerPrefs.GetFloat("max_steer", 16.0f);
 	}
 
-	public void SavePosRot()
-	{
+	public void SavePosRot() {
 		startPos = transform.position;
 		startRot = transform.rotation;
 	}
 
-	public void RestorePosRot()
-	{
+	public void RestorePosRot() {
+		after_reset = true;
 		Set(startPos, startRot);
 	}
 
-	public void RequestThrottle(float val)
-	{
+	public void RequestThrottle(float val) {
 		requestTorque = val;
 		requestBrake = 0f;
-		//Debug.Log("request throttle: " + val);
 	}
 
-    public void SetMaxSteering(float val)
-    {
-        maxSteer = val;
-		// had to disable this because PID max steering was affecting the global max_steering
-        // PlayerPrefs.SetFloat("max_steer", maxSteer);
-        // PlayerPrefs.Save();
-    }
+	public void SetMaxSteering(float val) {
+		maxSteer = val;
+	}
 
-    public float GetMaxSteering()
-    {
-        return maxSteer;
-    }
+	public float GetMaxSteering() {
+		return maxSteer;
+	}
 
-	public void RequestSteering(float val)
-	{
+	public void RequestSteering(float val) {
 		requestSteering = Mathf.Clamp(val, -maxSteer, maxSteer);
-		//Debug.Log("request steering: " + val);
 	}
 
-	public void Set(Vector3 pos, Quaternion rot)
-	{
+	public void Set(Vector3 pos, Quaternion rot) {
 		rb.position = pos;
 		rb.rotation = rot;
 
-		//just setting it once doesn't seem to work. Try setting it multiple times..
-		StartCoroutine(KeepSetting(pos, rot, 1));
+		transform.position = pos;
+		transform.rotation = rot;
 	}
 
-	IEnumerator KeepSetting(Vector3 pos, Quaternion rot, int numIter)
-	{
-		while(numIter > 0)
-		{
-			rb.isKinematic = true;
-			
-			yield return new WaitForFixedUpdate();
-
-			rb.position = pos;
-			rb.rotation = rot;
-			transform.position = pos;
-			transform.rotation = rot;
-
-			numIter--;
-
-			rb.isKinematic = false;
-		}
-	}
-
-	public float GetSteering()
-	{
+	public float GetSteering() {
 		return requestSteering;
 	}
 
-	public float GetThrottle()
-	{
+	public float GetThrottle() {
 		return requestTorque;
 	}
 
-	public float GetFootBrake()
-	{
+	public float GetFootBrake() {
 		return requestBrake;
 	}
 
-	public float GetHandBrake()
-	{
+	public float GetHandBrake() {
 		return 0.0f;
 	}
 
-	public Vector3 GetVelocity()
-	{
+	public Vector3 GetVelocity() {
 		return velocity;
 	}
 
-	public Vector3 GetAccel()
-	{
+	public Vector3 GetAccel() {
 		return acceleration;
 	}
-	public Quaternion GetGyro()
-	{
-	  return gyro;
+	public Quaternion GetGyro() {
+		return gyro;
   	}
-	public float GetOrient ()
-	{
-		Vector3 dir = transform.forward;
-		return Mathf.Atan2( dir.z, dir.x);
+	public float GetOrient () {
+		Vector3 dir = this.transform.forward;
+		return Mathf.Atan2(dir.z, dir.x);
 	}
 
-	public Transform GetTransform()
-	{
-		return this.transform;
+	public Transform GetTransform() {
+		return transform;
 	}
 
-	public bool IsStill()
-	{
+	public bool IsStill() {
 		return rb.IsSleeping();
 	}
 
-	public void RequestFootBrake(float val)
-	{
+	public void RequestFootBrake(float val) {
 		requestBrake = val;
 	}
 
-	public void RequestHandBrake(float val)
-	{
+	public void RequestHandBrake(float val) {
 		//todo
 	}
 	
-	// Update is called once per frame
+	// Update is called once per game frame, this frequency can vary
 	void Update () {
-	
 		UpdateWheelPositions();
 	}
 
-	public string GetActivity()
-	{
+	public string GetActivity() {
 		return activity;
 	}
 
-	public void SetActivity(string act)
-	{
+	public void SetActivity(string act) {
 		activity = act;
 	}
 
-	void FixedUpdate()
-	{
+	// FixedUpdate is called 50 times per second and this can not be changed
+	void FixedUpdate() {
+		if (after_reset) {
+			Set(startPos, startRot);
+			rb.velocity = Vector3.zero;
+			velocity = Vector3.zero;
+			gyro = Quaternion.identity;
+			requestTorque = 0f;
+			requestBrake = 0f;
+			requestSteering = 0f;
+
+			for (int i = 0; i < wheelColliders.Length; i++) {
+				WheelCollider wc = wheelColliders[i];
+				wc.motorTorque = 0f;
+				wc.brakeTorque = 0f;
+			}
+
+			after_reset = false;
+		}
+
 		lastSteer = requestSteering;
 		lastAccel = requestTorque;
 
 		float throttle = requestTorque * maxTorque;
-		float steerAngle = requestSteering;
-		// float deltaSteerAngle = Mathf.Clamp(steerAngle - wheelColliders[2].steerAngle, -SteerSpeed*Time.fixedDeltaTime, SteerSpeed*Time.fixedDeltaTime);
-		float deltaSteerAngle = steerAngle - wheelColliders[2].steerAngle;
-        float brake = requestBrake;
-
+		float brake = requestBrake;
 
 		//front two tires.
-		wheelColliders[2].steerAngle += deltaSteerAngle;
-		wheelColliders[3].steerAngle += deltaSteerAngle;
+		wheelColliders[2].steerAngle = requestSteering;
+		wheelColliders[3].steerAngle = requestSteering;
+
+		Vector3 prevVel = velocity;
+		velocity = transform.InverseTransformDirection(rb.velocity);
+		acceleration = (velocity - prevVel)/Time.deltaTime;
+		gyro = rb.rotation * Quaternion.Inverse(rb.rotation);
 
 		//four wheel drive at the moment
-		foreach(WheelCollider wc in wheelColliders)
-		{
-			if(rb.velocity.magnitude < maxSpeed)
-			{
+		for (int i = 0; i < wheelColliders.Length; i++) {
+			WheelCollider wc = wheelColliders[i];
+
+			if (rb.velocity.magnitude < maxSpeed) {
 				wc.motorTorque = throttle;
-			}
-			else
-			{
+			} else {
 				wc.motorTorque = 0.0f;
 			}
 
 			wc.brakeTorque = 400f * brake;
 		}
 
-		prevVel = velocity;
-		velocity = transform.InverseTransformDirection(rb.velocity);
-		acceleration = (velocity - prevVel)/Time.deltaTime;
-		gyro = rb.rotation * Quaternion.Inverse(rotation);
-		rotation = rb.rotation;
+
 	}
 
-	void FlipUpright()
-	{
+	void FlipUpright() {
 		Quaternion rot = Quaternion.Euler(180f, 0f, 0f);
-		this.transform.rotation = transform.rotation * rot;
-		transform.position = transform.position + Vector3.up * 2;
+		transform.rotation *= rot;
+		transform.position += Vector3.up * 2;
 	}
 
-	void UpdateWheelPositions()
-	{
+	void UpdateWheelPositions() {
 		Quaternion rot;
 		Vector3 pos;
 
-		for(int i = 0; i < wheelColliders.Length; i++)
-		{
+		for(int i = 0; i < wheelColliders.Length; i++) {
 			WheelCollider wc = wheelColliders[i];
 			Transform tm = wheelMeshes[i];
 
@@ -264,18 +221,15 @@ public class Car : MonoBehaviour, ICar {
 	}
 
 	//get the name of the last object we collided with
-	public string GetLastCollision()
-	{
+	public string GetLastCollision() {
 		return last_collision;
 	}
 
-	public void ClearLastCollision()
-	{
+	public void ClearLastCollision() {
 		last_collision = "none";
 	}
 
-	void OnCollisionEnter(Collision col)
-	{
+	void OnCollisionEnter(Collision col) {
 		last_collision = col.gameObject.name;
 	}
 }

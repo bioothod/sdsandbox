@@ -97,10 +97,10 @@ namespace tk
                 return result;
             }
 
-            // Concat all reveiced TCP buffers to have change to extract as much as possible JSON objects
+            // Concat all received TCP buffers to have change to extract as much as possible JSON objects
             foreach(string str in recv_packets)
             {
-                jsonBuffer = String.Concat (jsonBuffer, str);
+                jsonBuffer = String.Concat(jsonBuffer, str);
             }
 
             recv_packets.Clear();
@@ -110,65 +110,49 @@ namespace tk
 
             for (int i = 0; i < jsonMessages.Length; i++) {
                 // Ignore empty parts, this is likely side effect of Split
-                if (jsonMessages[i].Length == 0)
-                {
+                if (jsonMessages[i].Length == 0) {
                     continue;
                 }
-                // Since split remove delimitor, add it back to keep JSON structure
+                // Since split removes delimitor, add it back to keep JSON structure
                 string theMessage = jsonMessages[i].Insert(0, "{");
                 // If JSON message is complete, add to list of complete JSON message
-                if (theMessage[0]=='{' && theMessage.Substring(theMessage.Length - 1)[0]=='}') 
-                {
+                if (theMessage[0]=='{' && theMessage.Substring(theMessage.Length - 1)[0]=='}') {
                     result.Add(theMessage);
                 } else {
                     if (i==(jsonMessages.Length-1)) {
                         //last message is a partial one, push back to recv_packets
-                        recv_packets.Add (theMessage);
+                        recv_packets.Add(theMessage);
                     } else {
-                        Debug.Log("Unexpected partial JSON object in the middle of the TCP buffer !, buffer = "+jsonBuffer);                    
+                        Debug.Log("Unexpected partial JSON object in the middle of the TCP buffer !, buffer = " + jsonBuffer);
                     }
                 }
-                
             }
             return result;
         }
 
         // Send each queued json packet to the recipient which registered
         // with our dispatcher.
-        void Dispatch()
-        {
-            lock(_locker)
-            {
+        void Dispatch() {
+            lock(_locker) {
                 List<string> msgs = ExtractJsonFromStream();
-                foreach (string msg in msgs)
-                {
-                    try
-                    {
-                        //Only extract and propagate the last one to avoid to overload simulator in case of burst
-                        JSONObject j = new JSONObject(msg);
+				foreach (string msg in msgs) {
+					try {
+						JSONObject j = new JSONObject(msg);
 
-                        string msg_type = j["msg_type"].str;
+						string msg_type = j["msg_type"].str;
 
-                        // Debug.Log("Got: " + msg_type);
-
-                        dispatcher.Dipatch(msg_type, j);
-
-                    }
-                    catch(Exception e)
-                    {
-                        Debug.LogError(e.ToString());
-                    }
-
-                }
+						dispatcher.Dipatch(msg_type, j);
+					} catch(Exception e) {
+						Debug.LogError(e.ToString());
+					}
+				}
             }
         }
 
 
         // Optionally poll our dispatch queue in the main thread context
-        void Update()
-        {
-            if (dispatchInMainThread)
-            {
+        void Update() {
+            if (dispatchInMainThread) {
                 Dispatch();
             }
         }
